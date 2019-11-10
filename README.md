@@ -137,7 +137,7 @@ func WorkWithFile(path string, flags, mode int) FileResource {
         }
         defer file.Close()
         
-        err = useFile(file)
+        err = callback(file)
         if err != nil {
             return err
         }
