@@ -36,18 +36,18 @@ Typically, all these operations can also fail.
 Let's look at a typical Go function that work with file:
 ```go
 func writeFile1(path, content string) error {
-	file, err := os.OpenFile(path, os.O_CREATE | os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+    file, err := os.OpenFile(path, os.O_CREATE | os.O_WRONLY, 0600)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
 
-	_, err = file.Write([]byte(content))
-	if err != nil {
-		return err
-	}
+    _, err = file.Write([]byte(content))
+    if err != nil {
+        return err
+    }
 
-	return err
+    return err
 }
 ```
 
@@ -73,18 +73,18 @@ func writeFile1(path, content string) error {
 type FileCallback = func (fd *os.File) error
 
 func WorkWithFile(path string, flags, mode int, useFile FileCallback) error {
-	file, err := os.OpenFile(path, flags, mode)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	
+    file, err := os.OpenFile(path, flags, mode)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+    
     err = useFile(file)
-	if err != nil {
-		return err
-	}
+    if err != nil {
+        return err
+    }
 
-	return err
+    return err
 }
 ```
 
@@ -158,7 +158,7 @@ func main() {
 }
 
 func myBusinessCode(stateFileRes FileResource) error {
-	return stateFileRes(func (fd *os.File) error {
+    return stateFileRes(func (fd *os.File) error {
        // use fd
     })
 }
@@ -169,16 +169,16 @@ as they usually require to write down to much details:
 
 ```go
 var TempFileResource FileResource =
-	func(callback FileResourceCallback) error {
-		file, err := ioutil.TempFile("", "")
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		defer os.Remove(file.Name())
+    func(callback FileResourceCallback) error {
+        file, err := ioutil.TempFile("", "")
+        if err != nil {
+            return err
+        }
+        defer file.Close()
+        defer os.Remove(file.Name())
 
-		return callback(file)
-	}
+        return callback(file)
+    }
 ```
 
 Look how we re-used the same type, but implemented a different resource.
@@ -307,32 +307,32 @@ Using the CPS we can manage this and make it much simpler and safer to use:
 package main
 
 import (
-	"sync"
+    "sync"
 )
 
 type SafeWaitGroup interface {
-	Run(task func ())
-	Wait()
+    Run(task func ())
+    Wait()
 }
 
 type safeWaitGroupImpl struct {
-	wg *sync.WaitGroup
+    wg *sync.WaitGroup
 }
 
 func NewSafeWaitGroup() SafeWaitGroup {
-	return &safeWaitGroupImpl{new(sync.WaitGroup)}
+    return &safeWaitGroupImpl{new(sync.WaitGroup)}
 }
 
 func (swg *safeWaitGroupImpl) Run(task func ()) {
-	swg.wg.Add(1)
-	go func() {
-		task()
-		swg.wg.Add(-1)
-	}()
+    swg.wg.Add(1)
+    go func() {
+        task()
+        swg.wg.Add(-1)
+    }()
 }
 
 func (swg *safeWaitGroupImpl) Wait() {
-	swg.wg.Wait()
+    swg.wg.Wait()
 }
 ```
 
