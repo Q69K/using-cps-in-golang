@@ -368,6 +368,169 @@ func main() {
 }
 ```
 
+The `swg.Wait()` is also can be dropped from the list of things we should always care about:
+
+For this we can split `SafeWaitGroup` interface and expose to use only "safe" part:
+
+```go
+
+package main
+
+type Spawner interface {
+	Run(task func ())
+}
+
+type SafeWaitGroup interface {
+	Spawner
+	Wait()
+}
+
+// ...
+
+func RunGroup(taskRunner func(Spawner)) {
+	swg := NewSafeWaitGroup()
+	taskRunner(swg)
+	swg.Wait()
+}
+```
+
+The final result is incomparably much safer and easier to read.
+But this *ugly* "capture i" is needed because in for loop variable
+sharing the references and lambda captures also reference of loop variable, not copy:
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+func worker(id int) {
+    fmt.Printf("Worker %d starting\n", id)
+    time.Sleep(time.Second)
+    fmt.Printf("Worker %d done\n", id)
+}
+
+func main() {
+    RunGroup(func (spwn Spawner) {
+        for i := 1; i <= 5; i++ {
+            worker_i := i // capture i 
+            spwn.Run(func () {
+              worker(worker_i)
+            })
+        }
+    })
+}
+```
+
+Original version:
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+func worker(id int, wg *sync.WaitGroup) {
+    fmt.Printf("Worker %d starting\n", id)
+    time.Sleep(time.Second)
+    fmt.Printf("Worker %d done\n", id)
+    wg.Done()
+}
+
+func main() {
+    var wg sync.WaitGroup
+    for i := 1; i <= 5; i++ {
+        wg.Add(1)
+        go worker(i, &wg)
+    }
+    wg.Wait()
+}
+```
+
+This can be done by (OMG!) by another function which will receive copy of value and pass it to "worker"
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+func suspend(id int, run func (id int)) func() {
+    return func () {
+    	run(id)
+    }
+}
+
+func worker(id int) {
+    fmt.Printf("Worker %d starting\n", id)
+    time.Sleep(time.Second)
+    fmt.Printf("Worker %d done\n", id)
+}
+
+func main() {
+    RunGroup(func (spwn Spawner) {
+        for i := 1; i <= 5; i++ {
+            spwn.Run(suspend(i, worker))
+        }
+    })
+}
+```
+
+Or even do it as specialized shortcut:
+
+```go
+package main
+
+
+func suspend(id int, run func (id int)) func() {
+    return func () {
+    	run(id)
+    }
+}
+
+func RunNGoroutines(n int, callback func (i int)) {
+    RunGroup(func (spwn Spawner) {
+        for i := 1; i <= n; i++ {
+            spwn.Run(suspend(i, worker))
+        }
+    })
+}
+```
+
+And the final user code is:
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+func worker(id int) {
+    fmt.Printf("Worker %d starting\n", id)
+    time.Sleep(time.Second)
+    fmt.Printf("Worker %d done\n", id)
+}
+
+func main() {
+    RunNGoroutines(5, worker)
+}
+```
+
+The `RunGroup` can be used to easily create additional specialized extension,
+I think you can now image the implementation of something like `RunForEveryString(strs []string, func (s string) {})`
+
 ## Conclusion
 
 As we can see CPS can help you to invert resource control to avoid

@@ -4,8 +4,12 @@ import (
 	"sync"
 )
 
+type Spawner interface {
+	Run(task func())
+}
+
 type SafeWaitGroup interface {
-	Run(task func ())
+	Spawner
 	Wait()
 }
 
@@ -17,7 +21,7 @@ func NewSafeWaitGroup() SafeWaitGroup {
 	return &safeWaitGroupImpl{new(sync.WaitGroup)}
 }
 
-func (swg *safeWaitGroupImpl) Run(task func ()) {
+func (swg *safeWaitGroupImpl) Run(task func()) {
 	swg.wg.Add(1)
 	go func() {
 		task()
@@ -27,4 +31,10 @@ func (swg *safeWaitGroupImpl) Run(task func ()) {
 
 func (swg *safeWaitGroupImpl) Wait() {
 	swg.wg.Wait()
+}
+
+func RunGroup(taskRunner func(Spawner)) {
+	swg := NewSafeWaitGroup()
+	taskRunner(swg)
+	swg.Wait()
 }
